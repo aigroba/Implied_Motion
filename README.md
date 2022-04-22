@@ -13,9 +13,11 @@ filter_v_coco:
   - extracts v-coco IDs from the v-coco ID API
   - matches NSD IDs to the v-coco IDs & preserves the subject presentation order
   - creates csv files that contain the index matches between v-coco index/ NSD index
+
 re_scale_img:
   - uses manual v-coco subgroup & resizes them to the appropriate size
   - creates new directory & stores resized images there
+
 data:
   - that's mostly your code with my v-coco filter slapped onto it
   - basically, only the betas associated with the manually selected v-coco images are extracted
