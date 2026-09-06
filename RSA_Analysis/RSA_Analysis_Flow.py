@@ -1,24 +1,23 @@
-import os
+from pathlib import Path
 import imageio
 import numpy as np
 from sklearn.metrics.pairwise import paired_cosine_distances
 
 
-def flow_vectors(subj):
-    # create empty lists that can be filled later on
-    # flow_img_vectors_mgt: Vector components * magnitude
-    # flow_img_vectors: Vector components
+def flow_vectors(subj, NSD_PATH: str = '/Datasets/NSD/'):
+
     flow_img_vectors_mgt = []
     flow_img_vectors = []
     flow_img_mgt = []
 
-    flow_img_path = os.path.join('/Datasets/NSD/results', subj, 'flow/')
-    flow_dir = sorted(os.listdir(flow_img_path))
+    flow_img_path = NSD_PATH / 'results' / subj / 'flow/'
+    flow_dir = sorted((flow_img_path).listdir())
 
     for img in flow_dir:
         # load in pictures from image directory
         flow_img_idx = int(img.replace('.png', '')) - 1
         Image = imageio.imread(flow_img_path + img)
+
         # Vector Extraction from pixel RGB value based on Im2Flow's 'Visualize Flow' script
         mgt = Image[:, :, 2] / 255.0 * 30
         sin = Image[:, :, 0] / 255.0 * 2 - 1
@@ -37,11 +36,12 @@ def flow_vectors(subj):
         flow_img_vectors_mgt.append(vector_mgt)
         flow_img_vectors.append(vector_2)
         flow_img_mgt.append(wm)
-        # return variables: vector components * magnitude, vector components, magnitude
+
+    # return variables: vector components * magnitude, vector components, magnitude
     return flow_img_vectors_mgt, flow_img_vectors, flow_img_mgt
 
 
-def flow_vectors_RDM(subj):
+def flow_vectors_RDM(subj, NSD_PATH: str = '/Datasets/NSD/'):
     # vector_mgt: flow_vectors including magnitude
     # flow_components: only cosinus & sinus components
     # mgt: magnitude value only
@@ -78,19 +78,17 @@ def flow_vectors_RDM(subj):
         corr_vector_components = []
         corr_mgt = []
         print(idx1 + 1, '/', len(correlation_matrix_mgt), 'Done!')
-    np.save('/home/ana/PycharmProjects/Master/Datasets/NSD/results/' + subj + '/Flow_Correlations'
-                                                                              '/Correlation_vectors_mgt.npy',
-            correlation_matrix_mgt)
-    np.save('/home/ana/PycharmProjects/Master/Datasets/NSD/results/' + subj + '/Flow_Correlations'
-                                                                              '/Correlation_vectors_2.npy',
-            correlation_matrix_2)
-    np.save('/home/ana/PycharmProjects/Master/Datasets/NSD/results/' + subj + '/Flow_Correlations'
-                                                                              '/Correlation_magnitude.npy',
-            correlation_matrix_3)
+        np.save(NSD_PATH / 'results' / subj / 'Flow_Correlations' / 'Correlation_vectors_mgt.npy',
+                correlation_matrix_mgt)
+        np.save(NSD_PATH / 'results' / subj / 'Flow_Correlations' / 'Correlation_vectors_2.npy',
+                correlation_matrix_2)
+        np.save(NSD_PATH / 'results' / subj / 'Flow_Correlations' / 'Correlation_magnitude.npy',
+                correlation_matrix_3)
 
 
 def main():
-    subj = ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']
+    subj = ['subj01', 'subj02', 'subj03', 'subj04', 
+            'subj05', 'subj06', 'subj07', 'subj08']
     for subj in subj:
         print('Start calculations for ', subj)
         flow_vectors_RDM(subj)

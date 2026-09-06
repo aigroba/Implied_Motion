@@ -1,24 +1,20 @@
 import csv
 import glob
-import os
-from collections import Counter, defaultdict
-# import cv2
+import cv2
 import h5py
 import nibabel as nib
 import numpy as np
 import pandas as pd
-from scipy.stats import zscore
+from pathlib import Path
 from tqdm import tqdm
+from collections import Counter, defaultdict
+from scipy.stats import zscore
 from filter_v_coco import get_vcoco_nsd
 
 
-NSD_PATH = "/Datasets/NSD"
-DATA_PATH = '/Datasets/NSD/results'
 
-def get_img_ids(subj):
-    responses_path = os.path.join(NSD_PATH, "responses",
-                                  subj, "responses.tsv")
-
+def get_img_ids(subj,NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
+    responses_path = NSD_PATH / "responses" / subj / "responses.tsv"
     df = pd.read_csv(responses_path, sep="\t")
 
     # only consider existing sessions
@@ -35,14 +31,13 @@ def get_img_ids(subj):
     return img_ids_unique
 
 
-def get_study_vcoco(subj):
+def get_study_vcoco(subj, NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
     # since I manually selected a sub-set of images in v-coco, we can't just use the v-coco-id list from the original
     # repository. This reads in the manually selected image labels (NSD indexing) directly into the script and
     # filters for those images within the v-coco-list
-    vcoco_img_path = os.path.join(DATA_PATH,
-                                  subj,'Images_256')
-    os.chdir(vcoco_img_path)
-    v_img_list = os.listdir('..')
+    vcoco_img_path = NSD_PATH / 'results' / subj / 'Images_256'
+    # vcoco_img_path.chdir()
+    v_img_list = vcoco_img_path.glob('*.png')
     v_img_idx = []
     for i in v_img_list:
         v_img_idx.append((int(i.replace('.png','')))+ 1)
@@ -56,35 +51,29 @@ def get_study_vcoco(subj):
     return v_img
 
 
-def get_roi_masks(subj, data_format, atlas):
-    atlas_path = os.path.join(NSD_PATH, "rois",
-                              subj, data_format,
-                              atlas + ".nii.gz")
-
+def get_roi_masks(subj, data_format, atlas,
+                  NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
+    
+    atlas_path = NSD_PATH / "rois" / subj / data_format / f"{atlas}.nii.gz"
     atlas_file = nib.load(atlas_path).get_fdata()
     atlas_file = np.transpose(atlas_file, [2, 1, 0])
 
-    labels_path = os.path.join(NSD_PATH, "rois", "labels",
-                               atlas + ".mgz.ctab")
-
+    labels_path = NSD_PATH / "rois" / "labels" / f"{atlas}.mgz.ctab"
     df = pd.read_csv(labels_path, delim_whitespace=True)
     labels_file = dict(zip(df.iloc[:, 1], df.iloc[:, 0]))
 
     roi_masks = {}
-
     for name, digit in labels_file.items():
         roi_masks[name] = atlas_file == digit
 
     return roi_masks
 
 
-def get_betas(subj, data_format, data_type, roi_masks):
-    betas_path = os.path.join(NSD_PATH, "betas", subj,
-                              data_format, data_type)
+def get_betas(subj, data_format, data_type, roi_masks,
+              NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
 
-    session_files = os.path.join(betas_path, "*.hdf5")
-    session_files = sorted(glob.glob(session_files))
-
+    betas_path = NSD_PATH / "betas" / subj / data_format / data_type
+    session_files = sorted(glob.glob(betas_path / "*.hdf5"))
     roi_betas = defaultdict(list)
 
     for session_file in tqdm(session_files):
@@ -129,41 +118,36 @@ def avg_trials(betas, img_ids):
     return betas_avg, reps_var, num_reps
 
 
-def save_images(subj, img_ids, size=(320, 320)):
-    stimuli_path = os.path.join(NSD_PATH, "stimuli",
-                                "nsd_stimuli.hdf5")
+def save_images(subj, img_ids, size=(320, 320), 
+                NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
 
+    stimuli_path = NSD_PATH / "stimuli" / "nsd_stimuli.hdf5"
     for idx, img_id in enumerate(img_ids):
         with h5py.File(stimuli_path, "r") as f:
             image = np.array(f["imgBrick"][img_id - 1])
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
 
-        save_path = os.path.join(DATA_PATH, subj, "images", str(size[0]))
-        save_file = os.path.join(save_path, str(idx + 1).zfill(5) + ".png")
-
-        os.makedirs(save_path, exist_ok=True)
-
+        save_path = NSD_PATH/ 'results' / subj / "images" / str(size[0])
+        save_file = save_path / f"{str(idx + 1).zfill(5)}.png"
+        save_path.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(save_file, image)
 
 
-def save_salicon_overlap(subj, img_ids):
-    train_paths = glob.glob(os.path.join(NSD_PATH, "salicon",
-                                         "train", "*"))
-    valid_paths = glob.glob(os.path.join(NSD_PATH, "salicon",
-                                         "val", "*"))
+def save_salicon_overlap(subj, img_ids, 
+                         NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
+    
+    train_paths = glob.glob(NSD_PATH / "salicon" / "train" / "*")
+    valid_paths = glob.glob(NSD_PATH / "salicon" / "val" / "*")
 
     img_paths = sorted(train_paths + valid_paths)
 
-    img_names = [os.path.basename(x) for x in img_paths]
-    img_names = [os.path.splitext(x)[0] for x in img_names]
+    img_names = [img_paths(x).name for x in img_paths]
+    img_names = [Path(x).stem for x in img_names]
     img_names = [x.split("_", 2)[-1] for x in img_names]
-
     salicon_ids = [int(x) for x in img_names]
 
-    stim_info_path = os.path.join(NSD_PATH, "stimuli",
-                                  "nsd_stim_info_merged.csv")
-
+    stim_info_path = NSD_PATH / "stimuli" / "nsd_stim_info_merged.csv"
     df = pd.read_csv(stim_info_path)
     coco_ids = df["cocoId"].to_numpy()
 
@@ -173,10 +157,10 @@ def save_salicon_overlap(subj, img_ids):
     header = ["cocoId", "salicon"]
     data = zip(coco_ids_subj, salicon)
 
-    save_path = os.path.join(DATA_PATH, subj, "mscoco")
-    save_file = os.path.join(save_path, "info.csv")
+    save_path = NSD_PATH / 'results' / subj / "mscoco"
+    save_file = save_path /"info.csv"
 
-    os.makedirs(save_path, exist_ok=True)
+    save_path.mkdir(parents=True, exist_ok=True)
 
     with open(save_file, "w") as f:
         csv_out = csv.writer(f)
@@ -185,67 +169,65 @@ def save_salicon_overlap(subj, img_ids):
 
 
 def save_noise_ceiling(subj, data_format, data_type,
-                       atlas, roi_masks, num_reps):
+                       atlas, roi_masks, num_reps,
+                       NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
 
-    noise_path = os.path.join(NSD_PATH, "noise", subj,
-                              data_format, data_type,
-                              "ncsnr.nii.gz")
-
+    noise_path = NSD_PATH / "noise" / subj / data_format / data_type /"ncsnr.nii.gz"
     noise = nib.load(noise_path).get_fdata()
     noise = np.transpose(noise, [2, 1, 0])
 
     count = Counter(num_reps)
-
     custom = count[3] / 3 + count[2] / 2 + count[1] / 1
     custom = custom / (count[3] + count[2] + count[1])
 
     noise = np.sqrt(noise**2 / (noise**2 + custom))
 
     for name, mask in roi_masks.items():
-        save_path = os.path.join(DATA_PATH, subj, "noise", atlas)
-        save_file = os.path.join(save_path, name + ".npy")
+        save_path = NSD_PATH / 'results' / subj / "noise" / atlas
+        save_file = save_path / f"{name}.npy"
 
-        os.makedirs(save_path, exist_ok=True)
-
+        save_path.mkdir(parents=True, exist_ok=True)
         with open(save_file, "wb") as f:
             np.save(f, noise[mask])
 
 
-def save_betas(subj, atlas, betas):
-    for roi_name, roi_betas in betas.items():
-        save_path = os.path.join(DATA_PATH, subj, "betas", atlas)
-        save_file = os.path.join(save_path, roi_name + ".npy")
+def save_betas(subj, atlas, betas, 
+               NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
 
-        os.makedirs(save_path, exist_ok=True)
+    for roi_name, roi_betas in betas.items():
+        save_path = NSD_PATH / 'results' / subj / "betas" / atlas
+        save_file = save_path / f"{roi_name}.npy"
+        save_path.mkdir(parents=True, exist_ok=True)
 
         with open(save_file, "wb") as f:
             np.save(f, roi_betas)
 
 
-def save_variance(subj, atlas, variance):
+def save_variance(subj, atlas, variance, 
+                  NSD_PATH: Path = Path('/path/to/Datasets/NSD')):
     for roi_name, roi_variance in variance.items():
-        save_path = os.path.join(DATA_PATH, subj, "variance", atlas)
-        save_file = os.path.join(save_path, roi_name + ".npy")
+        save_path = NSD_PATH / 'results' / subj / "variance" / atlas
+        save_file = save_path / f"{roi_name}.npy"
 
-        os.makedirs(save_path, exist_ok=True)
+        save_path.mkdir(parents=True, exist_ok=True)
 
         with open(save_file, "wb") as f:
             np.save(f, roi_variance)
 
 
 def main():
+    NSD_PATH = Path("path/to/Datasets/NSD")
     data_format = "func1pt8mm"
     data_type = "betas_fithrf_GLMdenoise_RR"
-    SUBJS = ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']
-
+    SUBJS = ['subj01', 'subj02', 'subj03', 'subj04', 
+             'subj05', 'subj06', 'subj07', 'subj08']
+    
     for subj in SUBJS:
         img_ids = get_img_ids(subj)
         true_list = get_study_vcoco(subj)
 
         save_images(subj, img_ids)
-
         save_salicon_overlap(subj, img_ids)
-
         for atlas in ["streams", "HCP_MMP1", "prf-visualrois"]:
             roi_masks = get_roi_masks(subj, data_format, atlas)
 
@@ -257,7 +239,6 @@ def main():
 
             save_betas(subj, atlas, betas_avg)
             save_variance(subj, atlas, variance)
-
 
 if __name__ == "__main__":
     main()

@@ -1,14 +1,13 @@
-import os
+from pathlib import Path
 import numpy as np
 from scipy import stats
 
 
-def RDM_fMRI(subj, brain_regions):
+def RDM_fMRI(subj, brain_regions, NSD_PATH: str = '/Datasets/NSD/'):
     for SUBJ in subj:
         for region in brain_regions:
             # load in fMRI_data for the given brain region
-            tmp_path = os.path.join('/Datasets/NSD/results', SUBJ, 'betas/HCP_MMP1',
-                                    region + '.npy')
+            tmp_path = NSD_PATH / 'results' / SUBJ / 'betas' / 'HCP_MMP1' / f"{region}.npy"
             brain_area_data = np.load(tmp_path)
             correlation_matrix = np.zeros(
                 (len(brain_area_data), len(brain_area_data)))  # placeholder correlation matrix
@@ -23,14 +22,15 @@ def RDM_fMRI(subj, brain_regions):
                 corr_vector = [] # reset placeholder array for next correlation iteration
                 print((idx1 + 1), '/', len(brain_area_data))
 
-            np.save(
-                '/home/ana/PycharmProjects/Master/Datasets/NSD/results/' + SUBJ + '/fMRI_Correlations/Correlations_' + region + '.npy',
-                correlation_matrix)
+            np.save(NSD_PATH / 'results' / SUBJ / 'fMRI_Correlations' / f"Correlations_{region}.npy",
+                    correlation_matrix)
 
 
 def main():
-    brain_regions = ['V1', 'V2', 'V3', 'V3A', 'V3B', 'V6', 'V7', 'MT', 'MST', 'LO1', 'LO2']
-    subj = ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']
+    brain_regions = ['V1', 'V2', 'V3', 'V3A', 'V3B', 
+                     'V6', 'V7', 'MT', 'MST', 'LO1', 'LO2']
+    subj = ['subj01', 'subj02', 'subj03', 'subj04', 
+            'subj05', 'subj06', 'subj07', 'subj08']
     RDM_fMRI(subj, brain_regions)
 
 
