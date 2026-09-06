@@ -1,4 +1,7 @@
 # Implied_Motion
+Some files need to be downloaded from the [NSD Dataset](https://www.naturalscenesdataset.org/); the publically available fMRI-ML Image Classification Database.
+
+You will need to 
 
 ## Data_Preparation
 
